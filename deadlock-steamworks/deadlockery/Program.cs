@@ -1,8 +1,8 @@
 ﻿using DeadlockAPI;
-using ouwou.GC.Deadlock.Internal;
 using SharpCompress.Compressors.BZip2;
 using SharpCompress.Readers;
 using SteamKit2;
+using SteamKit2.GC.Deadlock.Internal;
 
 namespace deadlockery
 {

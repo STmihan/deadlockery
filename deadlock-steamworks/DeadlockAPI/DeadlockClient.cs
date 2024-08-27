@@ -1,7 +1,8 @@
-﻿using ouwou.GC.Deadlock.Internal;
+﻿using ProtoBuf;
 using SteamKit2;
 using SteamKit2.Authentication;
 using SteamKit2.GC;
+using SteamKit2.GC.Deadlock.Internal;
 using SteamKit2.Internal;
 
 namespace DeadlockAPI
@@ -20,6 +21,8 @@ namespace DeadlockAPI
         string previouslyStoredGuardData;
 
         const int APPID = 1422450;
+        
+        bool _isInitialized = false;
 
         public DeadlockClient(string userName, string password)
         {
@@ -37,7 +40,7 @@ namespace DeadlockAPI
             callbackMgr.Subscribe<SteamUser.LoggedOnCallback>(OnLoggedOn);
             callbackMgr.Subscribe<SteamGameCoordinator.MessageCallback>(OnGCMessage);
 
-            previouslyStoredGuardData = File.ReadAllText("guard.txt");
+            previouslyStoredGuardData = File.Exists("guard.txt") ? File.ReadAllText("guard.txt") : string.Empty;
         }
 
         public bool IsConnected { get => client.IsConnected; }
@@ -114,14 +117,18 @@ namespace DeadlockAPI
             {
                 game_id = new GameID(APPID)
             });
-
+            
             client.Send(playGame);
-
-            Thread.Sleep(5000);
-
+            
+            const int timeout = 10;
+            for (int i = 0; i < timeout; i++)
+            {
+                Console.WriteLine("Waiting for GC to be ready..." + (timeout - i));
+                Thread.Sleep(1000);
+            }
+            Console.WriteLine("Sending ClientHello");
             var clientHello = new ClientGCMsgProtobuf<CMsgCitadelClientHello>((uint)EGCBaseClientMsg.k_EMsgGCClientHello);
-            clientHello.Body.region_mode = ECitadelRegionMode.k_ECitadelRegionMode_ROW;
-            gameCoordinator.Send(clientHello, APPID);
+            client.GetHandler<SteamGameCoordinator>()?.Send(clientHello, APPID);
         }
 
         void OnGCMessage(SteamGameCoordinator.MessageCallback callback)
@@ -142,8 +149,8 @@ namespace DeadlockAPI
         }
 
         public async Task<U> SendAndReceiveWithJob<T, U>(ClientGCMsgProtobuf<T> msg)
-            where T : ProtoBuf.IExtensible, new()
-            where U : ProtoBuf.IExtensible, new()
+            where T : IExtensible, new()
+            where U : IExtensible, new()
         {
             msg.SourceJobID = client.GetNextJobID();
             gameCoordinator.Send(msg, APPID);
@@ -187,6 +194,7 @@ namespace DeadlockAPI
         public event EventHandler<ClientWelcomeEventArgs> ClientWelcomeEvent;
         void OnClientWelcome(IPacketGCMsg packetMsg)
         {
+            _isInitialized = true;
             var msg = new ClientGCMsgProtobuf<CMsgClientWelcome>(packetMsg);
             ClientWelcomeEvent?.Invoke(this, new ClientWelcomeEventArgs() { Data = msg.Body });
         }

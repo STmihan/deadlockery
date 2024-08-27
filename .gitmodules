@@ -1,0 +1,3 @@
+[submodule "deadlock-steamworks/SteamKit"]
+	path = deadlock-steamworks/SteamKit
+	url = https://github.com/STmihan/SteamKit.git
